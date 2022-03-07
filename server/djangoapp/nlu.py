@@ -24,7 +24,8 @@ def get_sentiment(text):
     """Find sentiment for the given text"""
     response = natural_language_understanding.analyze(
         text=text,
-        features=Features(sentiment=SentimentOptions())).get_result()
+        features=Features(sentiment=SentimentOptions()),
+        language='en').get_result()
     print(response)
     sentiment = response['sentiment']['document']['label']
     return sentiment

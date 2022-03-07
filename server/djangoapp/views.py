@@ -1,3 +1,4 @@
+from asyncio.windows_events import NULL
 from django.shortcuts import render
 from django.http import HttpResponseRedirect, HttpResponse
 from django.contrib.auth.models import User
@@ -9,7 +10,9 @@ from django.contrib import messages
 from datetime import datetime
 import logging
 import json
-from .restapis import get_dealers_from_cf,get_dealer_reviews ,post_request
+
+from .models import CarModel
+from .restapis import get_dealers_from_cf,get_dealer_reviews ,post_request,get_dealer
 
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
@@ -105,8 +108,10 @@ def get_dealerships(request):
 def get_dealer_details(request, dealer_id):
     context = {}
     reviews = get_dealer_reviews(dealer_id)
+    dealer = get_dealer(dealer_id) 
     context["dealer_id"] = dealer_id
     context['review_list'] = reviews
+    context['dealership'] = dealer
     return render(request, 'djangoapp/dealer_details.html', context)
 
 
@@ -114,25 +119,31 @@ def get_dealer_details(request, dealer_id):
 # Create a `add_review` view to submit a review
 def add_review(request, dealer_id):
     context = {}
+    url = "https://d19f2121.us-south.apigw.appdomain.cloud/dealer-reviews/dealership"
     if request.method == "GET":
-        dealerships = get_dealers_from_cf(dealer_id)
+        dealership = get_dealers_from_cf(url, id=dealer_id)
         context['dealer_id'] = dealer_id
-        context['dealership_list'] = dealerships
+        context['dealership'] = dealership
+        context['cars'] = CarModel.objects.all()
         return render(request, 'djangoapp/add_review.html', context)
     elif request.method == "POST":
         user = request.user
         if user.is_authenticated:
-
+            carReviewed = request.POST['car'].split('-')
+            
             review = dict()
-            review["id"] = dealer_id
-            review["name"] = user.full_name
+            review["name"] = user.first_name
             review["dealership"] = dealer_id
             review["review"] = request.POST['review']
-            review["purchase"] = request.POST['purchase']
             review["purchase_date"] = request.POST['purchase_date']
-            review["car_make"] = request.POST['car']
-            review["car_model"] = request.POST['car']
-            review["car_year"] = request.POST['car']
+            review["car_make"] = carReviewed[0]
+            review["car_model"] = carReviewed[1]
+            review["car_year"] = carReviewed[2]
+
+            if 'purchase' in request.POST:
+                 review['purchase'] = True
+            else:
+                review['purchase'] = False
 
             json_payload = dict()
             json_payload["review"] = review
